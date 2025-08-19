@@ -1,10 +1,13 @@
 import hashlib
 import os
 import shutil
-import requests 
 import pyfiglet
 import scanner
 import time
+import threading
+
+pending_vt = []   
+lock = threading.Lock()
 
 
 def sh(path):
@@ -28,60 +31,88 @@ def load_signatures(sigfile):
     return sigs
 
 
-def scan(root, sigs):
-    for base, folders, files in os.walk(root):
-        for nameF in files:
-            path = os.path.join(base, nameF)
+def scan_file(path,sigs):
             try:
                 sha = sh(path)
                 if sha in sigs:
                     print(f"Local check: VIRUS → {path}")
                     quarantine(path)
-                    continue
+                    return
+                    
 
                 #MalwareBazaar
                 mb_data = scanner.check_MB(sha)
                 if mb_data and mb_data.get("query_status") == "ok":
                     print(f"MalwareBazaar: Match found → {path}")
                     quarantine(path)
-                    continue
+                    return
+                    
 
                 #MalShare
                 ms_data = scanner.check_MalShare(sha)
                 if ms_data and "sha256" in ms_data:
                     print(f"MalShare: Match found → {path}")
                     quarantine(path)
-                    continue
+                    return
+                    
 
                 #ThreatFox
                 tf_data = scanner.check_TF(sha)
                 if tf_data and tf_data.get("query_status") == "ok":
                     print(f"ThreatFox: Match found → {path}")
                     quarantine(path)
-                    continue
+                    return
+                    
 
                 #Hybrid Analysis
                 ha_data = scanner.check_HA(sha)
                 if ha_data and isinstance(ha_data, list) and len(ha_data) > 0:
                     print(f"Hybrid Analysis: Match found → {path}")
                     quarantine(path)
-                    continue
+                    return
+                    
 
                 # VirusTotal
-                time.sleep(15)
-                vt_data = scanner.check_VT(sha)
-                if vt_data:
-                    positives = vt_data["data"]["attributes"]["last_analysis_stats"]["malicious"]
-                    if positives > 0:
-                        print(f"VirusTotal: {positives} engines flagged → {path}")
-                        quarantine(path)
-                        continue
+                with lock:
+                    pending_vt.append((sha,path))
 
-                print(f"Clean → {path}")
-
+                
             except Exception as e:
                 print(f"error {e}")
 
+
+
+
+def scan(root, sigs):
+    threads = []
+    for base, folders, files in os.walk(root):
+        for nameF in files:
+            path = os.path.join(base, nameF)
+            t = threading.Thread(target=scan_file, args=(path, sigs))
+            t.start()
+            threads.append(t)
+
+    for t in threads:
+        t.join()
+
+
+    print("\n=== Starting VirusTotal checks ===")
+
+    for sha, path in pending_vt:
+        print(f"Waiting 20s before VT check for {path}...")
+        for i in range(20 , 0 , -1):
+                    time.sleep(1)
+                    print(f"{i} s ...")  
+        vt_data = scanner.check_VT(sha)
+        if vt_data:
+            positives = vt_data["data"]["attributes"]["last_analysis_stats"]["malicious"]
+            if positives > 0:
+                print(f"VirusTotal: {positives} engines flagged → {path}")
+                quarantine(path)
+                continue
+        print(f"Clean (after VT) → {path}") 
+
+            
 def quarantine(filePath):
     quar_dir = "/home/mustang/Desktop/antivirus_project/quarantine"
     os.makedirs(quar_dir, exist_ok=True)
