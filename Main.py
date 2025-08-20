@@ -5,6 +5,7 @@ import pyfiglet
 import scanner
 import time
 import threading
+import psutil
 
 pending_vt = []   
 lock = threading.Lock()
@@ -81,6 +82,20 @@ def scan_file(path,sigs):
                 print(f"error {e}")
 
 
+def full_scan(sigs):
+     print("====== Starting FULL system scan ======")
+     for partition in psutil.disk_partitions():
+          try:
+               root = partition.mountpoint
+               print(f"Scanning drive :{root}")
+               scan(root,sigs)
+          except PermissionError:
+               print(f"Skipping {partition.device} (permission denied)")
+          except Exception as e:
+               print(f"Error accessing {partition.device}: {e}")
+                      
+
+
 
 
 def scan(root, sigs):
@@ -114,7 +129,8 @@ def scan(root, sigs):
 
             
 def quarantine(filePath):
-    quar_dir = "/home/mustang/Desktop/antivirus_project/quarantine"
+    quar_dir = os.path.join(os.getcwd(), "quarantine")
+
     os.makedirs(quar_dir, exist_ok=True)
     try:
         shutil.move(filePath, quar_dir)
@@ -127,9 +143,33 @@ def main():
     ascii_banner = pyfiglet.figlet_format("Security +")
     print(ascii_banner)
     sig = "signatures.txt"
-    path = "/home/mustang/Desktop/antivirus_project/testVirus"
     sigs = load_signatures(sig)
-    scan(path, sigs)
+    #path = "/home/mustang/Desktop/antivirus_project/testVirus"
+    time.sleep(2)
+
+    while True:
+         print("Enter your choise :")
+         print("1- Full computer scan")
+         print("2- enter the folder path to scan")
+         choice = input()
+
+         match choice:
+           case 1:
+              full_scan(sigs)
+              break
+           case 2:
+              print("enter the foder path here")
+              path = input() 
+              scan(path, sigs)
+              break
+           case _:
+              print("invalide choise")
+              break
+    
+                       
+              
+
+    
 
 if __name__ == "__main__":
     main()
