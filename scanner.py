@@ -1,17 +1,17 @@
 import requests
+import os
 
 
-
-VT_API_KEY = "YOUR_VIRUSTOTAL_KEY"
-HA_API_KEY = "YOUR_HYBRIDANALYSIS_KEY"
-MS_API_KEY = "YOUR_MALSHARE_KEY"
+VT_API_KEY = os.getenv("VT_API_KEY")
+HA_API_KEY = os.getenv("HA_API_KEY")
+MS_API_KEY = os.getenv("MS_API_KEY")
 
 
 
 # ================== VirusTotal ==================
 def check_VT(fileHash):
 
-    #virusTotal_Key = "5552916041499bbcd25f41e26c0fd9ec8e3008005b5532973d8faeacf4640193"
+    
     url = "https://www.virustotal.com/api/v3/files/"
 
     headers = {"x-apikey": VT_API_KEY}
